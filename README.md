@@ -1,118 +1,103 @@
 # piezogpt-rag
 
-A small Python RAG (Retrieval-Augmented Generation) pipeline built around a single PDF ("Linear Theory of Piezoelectricity"). It extracts text from the PDF, splits it into chunks, and is set up to create embeddings (via Google Gemini) and a vector store so you can build a retriever-powered chatbot.
+A focused Python RAG (Retrieval-Augmented Generation) pipeline for extracting knowledge from a PDF ("Linear Theory of Piezoelectricity") and preparing it for retrieval and generation. It provides reproducible scripts to extract text, split it into chunks, and scaffold embedding and retrieval steps so you can build a retriever-backed chatbot using Google Gemini or another model.
+
+## Features
+- PDF → plain text extraction (page markers preserved)
+- Text chunking with overlap (800-char chunks, 150-char overlap by default)
+- Examples showing how to call Google Gemini (google-genai) for model listing and generation
+- SVG diagrams in `assets/diagrams/` for a visual overview
 
 ## Stack
-- **Language(s):** Python (3.x)
-- **Runtime / style:** Simple script-based pipeline (no web framework)
-- **Notable libraries:** PyMuPDF (fitz) for PDF extraction, langchain_text_splitters for chunking, google-genai (Gemini client) for embeddings, python-dotenv for environment config
+- **Language:** Python 3.x
+- **Notable libraries:** PyMuPDF (fitz), langchain_text_splitters, python-dotenv, google-genai
 
-## Project layout
+## Quickstart (final-ready)
+These commands show the shortest path from a fresh clone to extracting and chunking the PDF.
 
-```
-.github/                     GitHub workflow/config (repo metadata)
-Databank/                    Storage for extracted data and outputs
-  output/                    output files (piezo_text.txt, chunks.json)
-data/                        source PDFs (e.g. Linear Theory of Piezoeletricity.pdf)
-src/                         core scripts
-  read_data.py               extract text from PDF -> Databank/output/piezo_text.txt
-  chunk_text.py              split extracted text into chunks -> Databank/output/chunks.json
-  create_embeddings.py       (placeholder) create embeddings from chunks using model API
-  vector_store.py            (placeholder) build / query vector store
-  retriever.py               (placeholder) retriever logic to fetch relevant chunks
-  chatbot.py                 (placeholder) glue to generate answers using retrieved context
-  list_models.py             example: list Gemini models using GEMINI_API_KEY
-  test_gemini.py             simple Gemini API usage example
-README.md                    this file
-requirements.txt.txt         Python dependencies (rename to requirements.txt)
+1. Clone and enter the repository
+```bash
+git clone https://github.com/Nicolaspwilde/piezogpt-rag.git
+cd piezogpt-rag
 ```
 
-How it fits together:
-- src/read_data.py extracts all pages from the PDF into a single text file with page markers under Databank/output/.
-- src/chunk_text.py splits that text into smaller chunks (800 token-ish chunks with overlap) and saves them as chunks.json.
-- The next steps (create embeddings, store vectors, and query via a retriever/chatbot) are scaffolded by the remaining scripts (create_embeddings.py, vector_store.py, retriever.py, chatbot.py). Examples for interacting with Google Gemini appear in test_gemini.py and list_models.py.
+2. (Recommended) Create a virtual environment
+```bash
+python -m venv .venv
+source .venv/bin/activate   # macOS / Linux
+.venv\Scripts\activate     # Windows (PowerShell)
+```
+
+3. Install dependencies
+- Create a `requirements.txt` with the following contents (or run the pip command below):
+```
+python-dotenv
+PyMuPDF
+langchain-text-splitters
+google-genai
+```
+- Install:
+```bash
+pip install -r requirements.txt
+# OR
+pip install python-dotenv PyMuPDF langchain-text-splitters google-genai
+```
+
+4. Configure credentials
+- Create a `.env` file at the repo root containing:
+```env
+GEMINI_API_KEY=your_google_gemini_api_key_here
+```
+- The example Gemini scripts (`src/test_gemini.py`, `src/list_models.py`) rely on this env var.
+
+5. Place the PDF to process
+- Put your PDF (the repository expects `Linear Theory of Piezoeletricity.pdf`) in the `data/` directory.
+
+6. Run extraction and chunking
+```bash
+python src/read_data.py     # -> Databank/output/piezo_text.txt
+python src/chunk_text.py    # -> Databank/output/chunks.json
+```
+
+7. Optional: test Gemini connectivity
+```bash
+python src/test_gemini.py
+```
+
+## Next steps (embeddings, vector store, chatbot)
+- `src/create_embeddings.py` — (placeholder) convert `Databank/output/chunks.json` into embeddings using your chosen model/API (e.g., Gemini via google-genai).
+- `src/vector_store.py` — (placeholder) build or persist a vector store (FAISS, Chroma, or other) from the embeddings.
+- `src/retriever.py` / `src/chatbot.py` — (placeholder) wire retrieval + generation to answer user queries with context from the vector store.
+
+If you want, I can implement a minimal `create_embeddings.py` that:
+- loads `chunks.json`,
+- calls Gemini to get embeddings per chunk,
+- writes `Databank/output/embeddings.json`.
+
+I can also add a small `chatbot.py` example that uses FAISS locally and queries Gemini for answer generation.
+
+## Files of interest
+- `src/read_data.py` — PDF → flattened text extraction (uses PyMuPDF)
+- `src/chunk_text.py` — text → chunks.json (langchain_text_splitters)
+- `src/test_gemini.py`, `src/list_models.py` — example uses of google-genai
+- `assets/diagrams/` — `pipeline.svg`, `architecture.svg` for visuals
+
+## Recommendations
+- Rename `requirements.txt.txt` (if present) to `requirements.txt` and populate it as shown above.
+- Avoid committing large generated outputs in `Databank/output/`. Consider adding `Databank/output/` to `.gitignore` if you want outputs local only.
+- Add basic error handling (file-not-found, missing env vars) to the scripts before sharing widely.
+- Add LICENSE and CONTRIBUTING.md if you expect external contributions.
 
 ## Visuals & diagrams
-
-Below are visual assets added to help you understand and present the project. They are stored under `assets/diagrams/` and render directly on GitHub.
-
-Pipeline overview:
+Pipeline overview and repository architecture diagrams are embedded in this README and stored under `assets/diagrams/`:
 
 ![Pipeline overview](assets/diagrams/pipeline.svg)
 
-Repository architecture & data flow:
-
 ![Architecture & data flow](assets/diagrams/architecture.svg)
 
+## Contributing
+- Open an issue if you want a feature (e.g., FAISS integration, hosted API, web UI).
+- PRs are welcome — keep changes focused and include tests/usage notes where appropriate.
 
-## Quickstart — run the pipeline locally
-
-1. Clone the repo
-   ```
-   git clone https://github.com/Nicolaspwilde/piezogpt-rag.git
-   cd piezogpt-rag
-   ```
-
-2. Install dependencies
-   - The repository contains `requirements.txt.txt`. Rename it and install:
-   ```
-   mv requirements.txt.txt requirements.txt   # optional but recommended
-   pip install -r requirements.txt
-   ```
-   - If you don't have a requirements file yet, at minimum install:
-   ```
-   pip install python-dotenv PyMuPDF langchain-text-splitters google-genai
-   ```
-
-3. Add your environment variables
-   - Create a `.env` at the repo root with:
-   ```
-   GEMINI_API_KEY=your_google_gemini_api_key_here
-   ```
-   - The scripts use `dotenv` to load this for API calls (see src/test_gemini.py and src/list_models.py).
-
-4. Extract text from the PDF
-   - Make sure `data/Linear Theory of Piezoeletricity.pdf` is present.
-   ```
-   python src/read_data.py
-   ```
-   - Output: Databank/output/piezo_text.txt
-
-5. Chunk the extracted text
-   ```
-   python src/chunk_text.py
-   ```
-   - Output: Databank/output/chunks.json
-
-6. (Next steps — embedding & retrieval)
-   - Implement or run `src/create_embeddings.py` to convert `chunks.json` to embeddings using Gemini.
-   - Build or load a vector store in `src/vector_store.py`.
-   - Wire up `src/retriever.py` and `src/chatbot.py` for query-time retrieval + generation.
-
-7. Test Gemini connectivity
-   ```
-   python src/test_gemini.py
-   ```
-   - This prints a short response from the configured Gemini model.
-
-## Files of interest
-- src/read_data.py — PDF → text extraction (uses PyMuPDF)
-- src/chunk_text.py — text → chunks.json (uses langchain_text_splitters.RecursiveCharacterTextSplitter)
-- src/test_gemini.py, src/list_models.py — examples for using google-genai / Gemini
-- Databank/output/ — script outputs (piezo_text.txt, chunks.json)
-
-## Notes & recommendations
-- Rename `requirements.txt.txt` to `requirements.txt` to follow conventions.
-- Add error handling around missing files and missing env vars in the scripts before production use.
-- Consider adding a small wrapper CLI (or Makefile / justfile) to chain steps: extract -> chunk -> embed -> build store -> serve.
-- Add a LICENSE and a short CONTRIBUTING.md if you expect outside contributions.
-
-## Example .env template
-```
-GEMINI_API_KEY=sk-...
-```
-
-## Try asking
-- "Can you add a minimal create_embeddings.py that calls Gemini for each chunk in Databank/output/chunks.json and writes embeddings to Databank/output/embeddings.json?"
-- "How should vector_store.py store embeddings locally (FAISS vs Chroma) for this project?"
-- "Can you implement a simple chatbot.py that loads the vector store and answers a user question using Gemini with top-5 retrieved chunks?"
+## License
+No license file is included in the repository. Add a LICENSE (e.g., MIT) if you want to make this project reusable by others.
