@@ -25,7 +25,7 @@ client = genai.Client(api_key=api_key)
 
 response = client.models.generate_content(
     model="gemini-3.5-flash",
-    contents="Introduce yourself in two sentences. and also say something in japanese."
+    contents="Introduce yourself in two sentences."
 )
 
 print("=" * 60)
