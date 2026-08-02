@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="260" viewBox="0 0 1000 260">
+  <style>
+    .box { fill:#0f172a; stroke:#60a5fa; stroke-width:2; rx:8; ry:8; }
+    .label { fill:#fff; font-family:Inter, Arial, sans-serif; font-size:14px; }
+    .title { fill:#fff; font-family:Inter, Arial, sans-serif; font-size:18px; font-weight:600; }
+    .small { font-size:12px; fill:#cbd5e1 }
+    .arrow { stroke:#60a5fa; stroke-width:3; marker-end:url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa" />
+    </marker>
+  </defs>
+
+  <rect x="20" y="70" width="150" height="70" class="box" />
+  <text x="95" y="105" text-anchor="middle" class="label">PDF</text>
+  <text x="95" y="125" text-anchor="middle" class="small">data/</text>
+
+  <rect x="220" y="30" width="170" height="150" class="box" />
+  <text x="305" y="95" text-anchor="middle" class="label">Extract</text>
+  <text x="305" y="115" text-anchor="middle" class="small">src/read_data.py
+Databank/output/piezo_text.txt</text>
+
+  <rect x="430" y="40" width="170" height="130" class="box" />
+  <text x="515" y="90" text-anchor="middle" class="label">Chunk</text>
+  <text x="515" y="110" text-anchor="middle" class="small">src/chunk_text.py
+Databank/output/chunks.json</text>
+
+  <rect x="640" y="40" width="170" height="130" class="box" />
+  <text x="725" y="85" text-anchor="middle" class="label">Embed</text>
+  <text x="725" y="105" text-anchor="middle" class="small">Gemini (google-genai)
+src/create_embeddings.py</text>
+
+  <rect x="850" y="70" width="130" height="70" class="box" />
+  <text x="915" y="105" text-anchor="middle" class="label">Vector Store</text>
+  <text x="915" y="125" text-anchor="middle" class="small">FAISS / Chroma</text>
+
+  <!-- arrows -->
+  <line x1="170" y1="105" x2="220" y2="105" class="arrow" />
+  <line x1="390" y1="105" x2="430" y2="105" class="arrow" />
+  <line x1="600" y1="105" x2="640" y2="105" class="arrow" />
+  <line x1="810" y1="105" x2="850" y2="105" class="arrow" />
+
+  <!-- title -->
+  <text x="30" y="30" class="title">Pipeline overview — piezogpt-rag</text>
+</svg>

@@ -32,6 +32,19 @@ How it fits together:
 - src/chunk_text.py splits that text into smaller chunks (800 token-ish chunks with overlap) and saves them as chunks.json.
 - The next steps (create embeddings, store vectors, and query via a retriever/chatbot) are scaffolded by the remaining scripts (create_embeddings.py, vector_store.py, retriever.py, chatbot.py). Examples for interacting with Google Gemini appear in test_gemini.py and list_models.py.
 
+## Visuals & diagrams
+
+Below are visual assets added to help you understand and present the project. They are stored under `assets/diagrams/` and render directly on GitHub.
+
+Pipeline overview:
+
+![Pipeline overview](assets/diagrams/pipeline.svg)
+
+Repository architecture & data flow:
+
+![Architecture & data flow](assets/diagrams/architecture.svg)
+
+
 ## Quickstart — run the pipeline locally
 
 1. Clone the repo
