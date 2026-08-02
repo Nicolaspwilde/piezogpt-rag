@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# VS Code
+.vscode/
+
+# ChromaDB (we'll create this later)
+chroma_db/
+
+# Output files (optional)
+output/*.txt
