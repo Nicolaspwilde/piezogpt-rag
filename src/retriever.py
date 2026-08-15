@@ -1,58 +1,77 @@
-import os
 from pathlib import Path
 
 import chromadb
-from dotenv import load_dotenv
-from google import genai
+from sentence_transformers import SentenceTransformer
 
 # ----------------------------------------
-# Load API Key
+# Configuration
+# ----------------------------------------
+
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+TOP_K = 5
+
+# ----------------------------------------
+# Paths
 # ----------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR / ".env")
+CHROMA_PATH = BASE_DIR / "chroma_db"
 
-client = genai.Client(
-    api_key=os.environ["GEMINI_API_KEY"]
+# ----------------------------------------
+# Load Embedding Model
+# ----------------------------------------
+
+print("Loading embedding model...")
+
+model = SentenceTransformer(
+    EMBEDDING_MODEL
 )
+
+print("Embedding model loaded.\n")
 
 # ----------------------------------------
 # Load ChromaDB
 # ----------------------------------------
 
 db = chromadb.PersistentClient(
-    path=str(BASE_DIR / "chroma_db")
+    path=str(CHROMA_PATH)
 )
 
-collection = db.get_collection("piezo_book")
+collection = db.get_collection(
+    name="piezo_book"
+)
 
-print(f"Database contains {collection.count()} chunks\n")
+print(
+    f"Database contains {collection.count()} chunks\n"
+)
 
 # ----------------------------------------
 # Ask Question
 # ----------------------------------------
 
-question = input("Ask a question: ")
+question = input("Ask a question: ").strip()
+
+if not question:
+    print("No question provided.")
+    exit()
 
 # ----------------------------------------
 # Embed Question
 # ----------------------------------------
 
-response = client.models.embed_content(
-    model="gemini-embedding-2",
-    contents=question
-)
-
-query_embedding = response.embeddings[0].values
+query_embedding = model.encode(
+    question,
+    normalize_embeddings=True
+).tolist()
 
 # ----------------------------------------
-# Search
+# Search ChromaDB
 # ----------------------------------------
 
 results = collection.query(
     query_embeddings=[query_embedding],
-    n_results=5
+    n_results=TOP_K
 )
 
 # ----------------------------------------
@@ -68,13 +87,15 @@ metadatas = results["metadatas"][0]
 distances = results["distances"][0]
 
 for i, (doc, meta, dist) in enumerate(
-        zip(documents, metadatas, distances),
-        start=1):
+    zip(documents, metadatas, distances),
+    start=1
+):
 
     print(f"\nResult {i}")
     print("-" * 80)
 
     print(f"Page      : {meta['page']}")
+    print(f"Chunk ID   : {meta.get('chunk_id', 'N/A')}")
     print(f"Distance  : {dist:.4f}")
 
     print("\nDocument:\n")

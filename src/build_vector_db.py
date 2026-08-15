@@ -1,50 +1,67 @@
 import json
-import os
-import time
 from pathlib import Path
 
 import chromadb
-from dotenv import load_dotenv
-from google import genai
+from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
 # ----------------------------------------
 # Configuration
 # ----------------------------------------
 
-MAX_RETRIES = 5
-INITIAL_WAIT = 2  # seconds
-REQUEST_DELAY = 0.2  # seconds between successful requests
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+BATCH_SIZE = 32
 
 # ----------------------------------------
-# Load API Key
+# Paths
 # ----------------------------------------
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BASE_DIR / ".env")
-
-client = genai.Client(
-    api_key=os.environ["GEMINI_API_KEY"]
+CHUNKS_FILE = (
+    BASE_DIR
+    / "Databank"
+    / "output"
+    / "chunks.json"
 )
+
+CHROMA_PATH = BASE_DIR / "chroma_db"
 
 # ----------------------------------------
 # Load Chunks
 # ----------------------------------------
 
-CHUNKS_FILE = BASE_DIR / "Databank" / "output" / "chunks.json"
-
 with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
     chunks = json.load(f)
 
-print(f"\nLoaded {len(chunks)} chunks")
+print("=" * 60)
+print("PiezoGPT Vector Database Builder")
+print("=" * 60)
+
+print(f"Loaded chunks : {len(chunks)}")
+print(f"Embedding model : {EMBEDDING_MODEL}")
+print(f"Batch size : {BATCH_SIZE}")
+print()
+
+# ----------------------------------------
+# Load Local Embedding Model
+# ----------------------------------------
+
+print("Loading embedding model...")
+
+model = SentenceTransformer(
+    EMBEDDING_MODEL
+)
+
+print("Embedding model loaded successfully.")
+print()
 
 # ----------------------------------------
 # Create Chroma Database
 # ----------------------------------------
 
 db = chromadb.PersistentClient(
-    path=str(BASE_DIR / "chroma_db")
+    path=str(CHROMA_PATH)
 )
 
 collection = db.get_or_create_collection(
@@ -55,91 +72,112 @@ collection = db.get_or_create_collection(
 # Resume Support
 # ----------------------------------------
 
-existing = collection.get(include=[])
+existing = collection.get(
+    include=[]
+)
 
 existing_ids = set(existing["ids"])
 
+remaining_chunks = [
+    chunk
+    for chunk in chunks
+    if str(chunk["chunk_id"]) not in existing_ids
+]
+
 print(f"Already stored : {len(existing_ids)}")
-print(f"Remaining      : {len(chunks) - len(existing_ids)}\n")
+print(f"Remaining      : {len(remaining_chunks)}")
+print()
+
+if not remaining_chunks:
+    print("All chunks are already embedded.")
+    print(f"Total in DB : {collection.count()}")
+    exit()
 
 # ----------------------------------------
-# Generate Embeddings
+# Generate Embeddings in Batches
 # ----------------------------------------
 
 embedded = 0
-skipped = 0
-failed = 0
 
-for chunk in tqdm(chunks):
+for start in tqdm(
+    range(
+        0,
+        len(remaining_chunks),
+        BATCH_SIZE
+    ),
+    desc="Embedding batches"
+):
 
-    chunk_id = str(chunk["chunk_id"])
+    batch = remaining_chunks[
+        start:start + BATCH_SIZE
+    ]
 
-    # Skip already processed chunks
-    if chunk_id in existing_ids:
-        skipped += 1
-        continue
+    texts = [
+        chunk["text"]
+        for chunk in batch
+    ]
 
-    wait_time = INITIAL_WAIT
-
-    embedding = None
-
-    for attempt in range(MAX_RETRIES):
-
-        try:
-
-            response = client.models.embed_content(
-                model="gemini-embedding-2",
-                contents=chunk["text"]
-            )
-
-            embedding = response.embeddings[0].values
-
-            break
-
-        except Exception as e:
-
-            print(
-                f"\nChunk {chunk_id} | Attempt {attempt + 1}/{MAX_RETRIES}"
-            )
-            print(e)
-
-            if attempt < MAX_RETRIES - 1:
-                print(f"Retrying in {wait_time} seconds...\n")
-                time.sleep(wait_time)
-                wait_time *= 2
-
-    # Failed after all retries
-    if embedding is None:
-        failed += 1
-        print(f"Skipping chunk {chunk_id}\n")
-        continue
-
-    # Store in ChromaDB
-    collection.add(
-        ids=[chunk_id],
-        embeddings=[embedding],
-        documents=[chunk["text"]],
-        metadatas=[
-            {
-                "page": chunk["page"]
-            }
-        ]
+    # Generate embeddings locally
+    embeddings = model.encode(
+        texts,
+        batch_size=BATCH_SIZE,
+        show_progress_bar=False,
+        normalize_embeddings=True
     )
 
-    existing_ids.add(chunk_id)
-    embedded += 1
+    embeddings = embeddings.tolist()
 
-    time.sleep(REQUEST_DELAY)
+    # ------------------------------------
+    # Prepare Chroma records
+    # ------------------------------------
+
+    ids = [
+        str(chunk["chunk_id"])
+        for chunk in batch
+    ]
+
+    documents = [
+        chunk["text"]
+        for chunk in batch
+    ]
+
+    metadatas = [
+        {
+            "page": chunk["page"],
+            "chunk_id": chunk["chunk_id"],
+            "source": chunk.get(
+                "source",
+                "Linear Theory of Piezoelectricity"
+            )
+        }
+        for chunk in batch
+    ]
+
+    # ------------------------------------
+    # Store batch
+    # ------------------------------------
+
+    collection.add(
+        ids=ids,
+        embeddings=embeddings,
+        documents=documents,
+        metadatas=metadatas
+    )
+
+    embedded += len(batch)
 
 # ----------------------------------------
 # Summary
 # ----------------------------------------
 
-print("\n" + "=" * 50)
+print()
+print("=" * 60)
 print("Embedding Complete")
-print("=" * 50)
+print("=" * 60)
+
 print(f"New Embeddings : {embedded}")
-print(f"Skipped        : {skipped}")
-print(f"Failed         : {failed}")
+print(f"Skipped        : {len(existing_ids)}")
+print(f"Failed         : 0")
 print(f"Total in DB    : {collection.count()}")
-print("=" * 50)
+
+print("=" * 60)
