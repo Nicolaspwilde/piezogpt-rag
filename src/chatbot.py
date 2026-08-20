@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from pathlib import Path
 
@@ -14,17 +15,17 @@ from sentence_transformers import SentenceTransformer
 
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
-# Models are tried in this order.
-# If one is temporarily unavailable, the next one is tried.
-GENERATION_MODELS = [
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
-]
+# Retrieve a larger candidate pool first.
+CANDIDATE_K = 15
 
+# Number of chunks finally sent to Gemini.
 TOP_K = 5
 
-MAX_RETRIES_PER_MODEL = 2
+# Currently working generation model.
+GENERATION_MODEL = "gemini-3-flash-preview"
+
+# Retry temporary Gemini failures.
+MAX_RETRIES = 2
 RETRY_WAIT_SECONDS = 5
 
 
@@ -88,8 +89,8 @@ collection = db.get_collection(
 )
 
 print(
-    f"Knowledge base contains "
-    f"{collection.count()} chunks.\n"
+    f"\nKnowledge base contains "
+    f"{collection.count()} chunks."
 )
 
 
@@ -99,12 +100,12 @@ print(
 
 SYSTEM_PROMPT = """
 You are PiezoGPT, a domain-specific question-answering
-assistant based on the book:
+assistant based exclusively on the book:
 
 "Linear Piezoelectric Plate Vibrations"
 by H. F. Tiersten.
 
-Your job is to answer questions using ONLY the
+Your task is to answer questions using ONLY the
 provided textbook context.
 
 IMPORTANT RULES:
@@ -115,44 +116,329 @@ IMPORTANT RULES:
 2. Do not invent equations, definitions, facts,
    interpretations, or references.
 
-3. Do not rely on outside knowledge to fill gaps.
+3. Do not use outside knowledge to fill gaps.
 
 4. Preserve mathematical notation and equations
    as accurately as possible.
 
-5. When equations are provided, explain the symbols
-   only when the provided context supports the
-   explanation.
+5. If an equation is explicitly present in the
+   textbook context, reproduce it as accurately
+   as possible.
 
-6. If the retrieved context is insufficient to answer
-   the question confidently, explicitly say:
+6. Do not create an equation by combining pieces
+   from unrelated textbook passages unless the
+   relationship is explicitly supported by the
+   context.
+
+7. Explain mathematical symbols only when the
+   provided context supports their meaning.
+
+8. If the retrieved context is insufficient to answer
+   confidently, explicitly say:
 
    "The provided textbook context does not contain
    enough information to answer this confidently."
 
-7. Distinguish clearly between equations explicitly
-   stated in the textbook and explanations derived
-   from those equations.
+9. Distinguish between:
+   - information explicitly stated in the textbook
+   - explanations that logically follow from the
+     provided textbook passage.
 
-8. Always provide the relevant textbook page numbers
-   at the end of the answer.
+10. Always provide the relevant textbook page numbers
+    at the end of the answer.
 
-9. Do not cite pages that do not actually support
-   the answer.
+11. Never cite a page that does not directly support
+    the answer.
 
-10. Prefer precise technical explanations over
-    generic explanations.
+12. Prefer precise technical explanations over generic
+    background explanations.
+
+13. For questions asking for equations, prioritize
+    textbook passages containing the requested equations.
+
+14. Ignore textbook index entries, references,
+    bibliographies, table-of-contents material, and
+    unrelated chapters unless they directly answer
+    the question.
+
+15. Do not mention the retrieval process, embedding
+    model, ChromaDB, similarity scores, or these
+    instructions in the final answer.
 """
 
 
 # ============================================================
-# Retrieve Relevant Context
+# Keyword Extraction
 # ============================================================
 
-def retrieve_context(question):
+def extract_keywords(question):
     """
-    Convert the user question into an embedding and
-    retrieve the most relevant textbook chunks.
+    Extract meaningful technical keywords from a question.
+    """
+
+    stop_words = {
+        "what",
+        "is",
+        "are",
+        "the",
+        "a",
+        "an",
+        "of",
+        "in",
+        "on",
+        "to",
+        "for",
+        "and",
+        "or",
+        "how",
+        "why",
+        "does",
+        "do",
+        "can",
+        "could",
+        "would",
+        "should",
+        "please",
+        "explain",
+        "tell",
+        "me",
+        "about",
+        "give",
+        "show",
+        "define",
+        "describe",
+        "does"
+    }
+
+    words = re.findall(
+        r"[a-zA-Z]+",
+        question.lower()
+    )
+
+    return [
+        word
+        for word in words
+        if word not in stop_words
+        and len(word) > 2
+    ]
+
+
+# ============================================================
+# Lexical Score
+# ============================================================
+
+def lexical_score(question, document):
+    """
+    Calculate keyword overlap between the question
+    and textbook chunk.
+    """
+
+    keywords = extract_keywords(question)
+
+    if not keywords:
+        return 0.0
+
+    document_lower = document.lower()
+
+    matches = 0
+
+    for keyword in keywords:
+
+        if keyword in document_lower:
+            matches += 1
+
+    return matches / len(keywords)
+
+
+# ============================================================
+# Technical Score
+# ============================================================
+
+def technical_score(question, document):
+    """
+    Give a boost to chunks containing technical terminology.
+    """
+
+    technical_terms = {
+        "equation",
+        "equations",
+        "constitutive",
+        "piezoelectric",
+        "piezoelectricity",
+        "elastic",
+        "electrostatic",
+        "electric",
+        "mechanical",
+        "stress",
+        "strain",
+        "displacement",
+        "dielectric",
+        "tensor",
+        "boundary",
+        "condition",
+        "vibration",
+        "continuum",
+        "energy",
+        "enthalpy",
+        "motion",
+        "differential"
+    }
+
+    question_words = set(
+        extract_keywords(question)
+    )
+
+    document_lower = document.lower()
+
+    relevant_terms = (
+        question_words.intersection(
+            technical_terms
+        )
+    )
+
+    if not relevant_terms:
+        return 0.0
+
+    matches = sum(
+        1
+        for term in relevant_terms
+        if term in document_lower
+    )
+
+    return matches / len(relevant_terms)
+
+
+# ============================================================
+# Equation Score
+# ============================================================
+
+def equation_score(question, document):
+    """
+    Detect whether a chunk contains mathematical content.
+
+    This is especially useful for questions asking for
+    equations, constitutive relations, differential
+    equations, etc.
+    """
+
+    question_lower = question.lower()
+
+    equation_question = any(
+        term in question_lower
+        for term in [
+            "equation",
+            "equations",
+            "constitutive",
+            "relation",
+            "relations",
+            "formula",
+            "formulation",
+            "differential",
+            "tensor",
+            "stress",
+            "strain"
+        ]
+    )
+
+    if not equation_question:
+        return 0.0
+
+    score = 0.0
+
+    # Explicit equation indicators.
+    if re.search(
+        r"\(\d+\.\d+\)",
+        document
+    ):
+        score += 0.35
+
+    # Mathematical assignment/equality.
+    if "=" in document:
+        score += 0.25
+
+    # Tensor/index notation.
+    if re.search(
+        r"[A-Za-z]\w*[_\s]?[ijklmn]",
+        document
+    ):
+        score += 0.15
+
+    # Common mathematical symbols / notation.
+    if any(
+        symbol in document
+        for symbol in [
+            "∂",
+            "Σ",
+            "∇",
+            "φ",
+            "ψ",
+            "ε",
+            "σ"
+        ]
+    ):
+        score += 0.15
+
+    # Explicit wording.
+    if "constitutive equations" in document.lower():
+        score += 0.10
+
+    return min(score, 1.0)
+
+
+# ============================================================
+# Document Quality Score
+# ============================================================
+
+def document_quality_score(document):
+    """
+    Penalize obvious low-value textbook material such as
+    indexes, references, and extremely short fragments.
+    """
+
+    text = document.lower().strip()
+
+    if len(text) < 150:
+        return 0.25
+
+    # Strong indicators of index/reference material.
+    if text.startswith("references"):
+        return 0.15
+
+    if "[index" in text:
+        return 0.20
+
+    if "bibliography" in text:
+        return 0.20
+
+    # Reference-style numbered citations.
+    reference_lines = len(
+        re.findall(
+            r"^\s*\d+\.",
+            document,
+            flags=re.MULTILINE
+        )
+    )
+
+    if reference_lines >= 3:
+        return 0.30
+
+    # Normal technical textbook content.
+    return 1.0
+
+
+# ============================================================
+# Retrieve Relevant Chunks
+# ============================================================
+
+def retrieve(question):
+    """
+    Retrieve and rerank textbook chunks using:
+
+    1. Semantic similarity
+    2. Lexical overlap
+    3. Technical terminology
+    4. Equation relevance
+    5. Document quality
     """
 
     query_embedding = embedding_model.encode(
@@ -161,56 +447,263 @@ def retrieve_context(question):
     ).tolist()
 
     results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=TOP_K
+        query_embeddings=[
+            query_embedding
+        ],
+        n_results=CANDIDATE_K
     )
 
     documents = results["documents"][0]
     metadatas = results["metadatas"][0]
     distances = results["distances"][0]
 
-    context_parts = []
+    candidates = []
 
-    for i, (document, metadata, distance) in enumerate(
-        zip(documents, metadatas, distances),
-        start=1
+    for document, metadata, distance in zip(
+        documents,
+        metadatas,
+        distances
     ):
 
-        page = metadata.get(
-            "page",
-            "Unknown"
+        lexical = lexical_score(
+            question,
+            document
         )
 
-        chunk_id = metadata.get(
-            "chunk_id",
-            "Unknown"
+        technical = technical_score(
+            question,
+            document
         )
 
-        context_parts.append(
-            f"""
+        equation = equation_score(
+            question,
+            document
+        )
+
+        quality = document_quality_score(
+            document
+        )
+
+        # Convert Chroma distance into a similarity-like score.
+        semantic = 1 / (
+            1 + distance
+        )
+
+        # ----------------------------------------------------
+        # Combined relevance
+        # ----------------------------------------------------
+
+        combined = (
+            0.35 * semantic
+            +
+            0.20 * lexical
+            +
+            0.10 * technical
+            +
+            0.20 * equation
+            +
+            0.15 * quality
+        )
+
+        candidates.append(
+            {
+                "document": document,
+                "page": metadata.get(
+                    "page",
+                    "Unknown"
+                ),
+                "chunk_id": metadata.get(
+                    "chunk_id",
+                    "Unknown"
+                ),
+                "distance": distance,
+                "semantic_score": semantic,
+                "lexical_score": lexical,
+                "technical_score": technical,
+                "equation_score": equation,
+                "quality_score": quality,
+                "combined_score": combined
+            }
+        )
+
+    # --------------------------------------------------------
+    # Remove clearly poor candidates
+    # --------------------------------------------------------
+
+    filtered = [
+        candidate
+        for candidate in candidates
+        if candidate["quality_score"] >= 0.25
+    ]
+
+    # If filtering somehow removes everything,
+    # fall back to the original candidates.
+    if not filtered:
+        filtered = candidates
+
+    # --------------------------------------------------------
+    # Sort
+    # --------------------------------------------------------
+
+    filtered.sort(
+        key=lambda x: x["combined_score"],
+        reverse=True
+    )
+
+    return filtered[:TOP_K]
+
+
+# ============================================================
+# Build Textbook Context
+# ============================================================
+
+def build_context(results):
+    """
+    Convert retrieval results into the context format
+    expected by Gemini.
+
+    Supports:
+    1. List of reranked dictionaries returned by retrieve()
+    2. Raw ChromaDB result dictionaries
+    """
+
+    context_parts = []
+
+    # --------------------------------------------------------
+    # Case 1: retrieve() returned a list of dictionaries
+    # --------------------------------------------------------
+
+    if isinstance(results, list):
+
+        for i, result in enumerate(results, start=1):
+
+            if isinstance(result, dict):
+
+                document = result.get(
+                    "document",
+                    ""
+                )
+
+                page = result.get(
+                    "page",
+                    "Unknown"
+                )
+
+                chunk_id = result.get(
+                    "chunk_id",
+                    "Unknown"
+                )
+
+                distance = result.get(
+                    "distance",
+                    None
+                )
+
+                distance_text = (
+                    f"{distance:.4f}"
+                    if isinstance(distance, (int, float))
+                    else "Unknown"
+                )
+
+            # ------------------------------------------------
+            # Unexpected string result
+            # ------------------------------------------------
+
+            elif isinstance(result, str):
+
+                document = result
+                page = "Unknown"
+                chunk_id = "Unknown"
+                distance_text = "Unknown"
+
+            else:
+
+                continue
+
+            context_parts.append(
+                f"""
 --- SOURCE {i} ---
-Page: {page}
+Textbook Page: {page}
+Chunk ID: {chunk_id}
+Similarity Distance: {distance_text}
+
+{document}
+"""
+            )
+
+        return "\n".join(context_parts)
+
+    # --------------------------------------------------------
+    # Case 2: raw ChromaDB response
+    # --------------------------------------------------------
+
+    if isinstance(results, dict):
+
+        documents = results.get(
+            "documents",
+            [[]]
+        )[0]
+
+        metadatas = results.get(
+            "metadatas",
+            [[]]
+        )[0]
+
+        distances = results.get(
+            "distances",
+            [[]]
+        )[0]
+
+        for i, (document, metadata, distance) in enumerate(
+            zip(
+                documents,
+                metadatas,
+                distances
+            ),
+            start=1
+        ):
+
+            metadata = metadata or {}
+
+            page = metadata.get(
+                "page",
+                "Unknown"
+            )
+
+            chunk_id = metadata.get(
+                "chunk_id",
+                "Unknown"
+            )
+
+            context_parts.append(
+                f"""
+--- SOURCE {i} ---
+Textbook Page: {page}
 Chunk ID: {chunk_id}
 Similarity Distance: {distance:.4f}
 
 {document}
 """
-        )
+            )
 
-    return "\n".join(context_parts)
+        return "\n".join(context_parts)
 
-
+    raise TypeError(
+        f"Unexpected retrieval result type: "
+        f"{type(results).__name__}"
+    )
 # ============================================================
 # Generate Answer
 # ============================================================
 
-def generate_answer(question, context):
+def generate_answer(question, results):
     """
-    Send the retrieved textbook context to Gemini.
+    Generate a grounded answer using Gemini.
+    """
 
-    Models are attempted in order. Temporary failures
-    automatically trigger retries and model fallback.
-    """
+    context = build_context(
+        results
+    )
 
     prompt = f"""
 {SYSTEM_PROMPT}
@@ -228,116 +721,83 @@ USER QUESTION
 {question}
 
 ============================================================
-ANSWER INSTRUCTIONS
+ANSWER
 ============================================================
 
-Answer the question using the textbook context above.
-
-Structure the answer clearly.
+Answer the user's question using ONLY the textbook
+context above.
 
 For technical questions:
 
-- State the answer directly.
-- Include relevant equations when available.
-- Explain the equations using only supported context.
-- Avoid unnecessary general background.
-- Clearly acknowledge when the context is insufficient.
+- Answer directly.
+- Use equations when the retrieved context contains them.
+- Preserve equation numbering when available.
+- Explain symbols only when supported by the context.
+- Keep the answer concise but technically useful.
+- Do not add external facts.
 
-At the end, include:
+At the end provide:
 
 Sources:
 - Page X
 - Page Y
 
-Only include pages that directly support your answer.
+Only include pages that directly support the answer.
 """
 
-    # --------------------------------------------------------
-    # Try each Gemini model
-    # --------------------------------------------------------
+    for attempt in range(
+        1,
+        MAX_RETRIES + 1
+    ):
 
-    for model_name in GENERATION_MODELS:
+        try:
 
-        print(
-            f"Trying generation model: {model_name}"
-        )
+            response = client.models.generate_content(
+                model=GENERATION_MODEL,
+                contents=prompt
+            )
 
-        # ----------------------------------------------------
-        # Retry individual model
-        # ----------------------------------------------------
-
-        for attempt in range(1, MAX_RETRIES_PER_MODEL + 1):
-
-            try:
-
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt
+            if not response.text:
+                raise RuntimeError(
+                    "Gemini returned an empty response."
                 )
 
-                # ------------------------------------------------
-                # Validate response
-                # ------------------------------------------------
+            print(
+                f"✓ Answer generated using "
+                f"{GENERATION_MODEL}\n"
+            )
 
-                if not response.text:
-                    raise RuntimeError(
-                        "Gemini returned an empty response."
-                    )
+            return response.text
+
+        except Exception as e:
+
+            print(
+                f"Gemini request failed "
+                f"(attempt {attempt}/{MAX_RETRIES})"
+            )
+
+            print(
+                f"Error: {e}"
+            )
+
+            if attempt < MAX_RETRIES:
+
+                wait_time = (
+                    RETRY_WAIT_SECONDS * attempt
+                )
 
                 print(
-                    f"✓ Answer generated using "
-                    f"{model_name}\n"
+                    f"Retrying in "
+                    f"{wait_time} seconds...\n"
                 )
 
-                return response.text
-
-            except Exception as e:
-
-                print(
-                    f"Model {model_name} failed "
-                    f"(attempt "
-                    f"{attempt}/{MAX_RETRIES_PER_MODEL})"
+                time.sleep(
+                    wait_time
                 )
 
-                print(f"Error: {e}")
+            else:
 
-                # --------------------------------------------
-                # Retry
-                # --------------------------------------------
-
-                if attempt < MAX_RETRIES_PER_MODEL:
-
-                    wait_time = (
-                        RETRY_WAIT_SECONDS * attempt
-                    )
-
-                    print(
-                        f"Retrying in "
-                        f"{wait_time} seconds...\n"
-                    )
-
-                    time.sleep(wait_time)
-
-        # ----------------------------------------------------
-        # Current model failed completely
-        # ----------------------------------------------------
-
-        print(
-            f"\nModel {model_name} unavailable."
-        )
-
-        print(
-            "Trying next generation model...\n"
-        )
-
-    # --------------------------------------------------------
-    # All models failed
-    # --------------------------------------------------------
-
-    raise RuntimeError(
-        "All configured Gemini generation models failed.\n"
-        f"Models attempted: {GENERATION_MODELS}"
-    )
+                raise
 
 
 # ============================================================
@@ -346,6 +806,7 @@ Only include pages that directly support your answer.
 
 def main():
 
+    print()
     print("=" * 70)
     print("PiezoGPT")
     print("=" * 70)
@@ -355,30 +816,38 @@ def main():
         "of Piezoelectricity."
     )
 
-    print("Type 'exit' or 'quit' to stop.")
+    print(
+        "Type 'exit' or 'quit' to stop."
+    )
+
     print()
 
     while True:
 
-        # ----------------------------------------------------
-        # Get question
-        # ----------------------------------------------------
+        question = input(
+            "You: "
+        ).strip()
 
-        question = input("You: ").strip()
+        # ----------------------------------------------------
+        # Exit
+        # ----------------------------------------------------
 
         if question.lower() in {
             "exit",
             "quit"
         }:
 
-            print("\nGoodbye!")
+            print(
+                "\nGoodbye!"
+            )
+
             break
 
         if not question:
             continue
 
         # ----------------------------------------------------
-        # Retrieve
+        # Retrieval
         # ----------------------------------------------------
 
         print(
@@ -387,8 +856,21 @@ def main():
 
         try:
 
-            context = retrieve_context(
+            results = retrieve(
                 question
+            )
+
+            if not results:
+
+                print(
+                    "\nNo relevant textbook content found."
+                )
+
+                continue
+
+            print(
+                f"Retrieved {len(results)} "
+                f"relevant textbook chunks."
             )
 
         except Exception as e:
@@ -402,7 +884,7 @@ def main():
             continue
 
         # ----------------------------------------------------
-        # Generate
+        # Generation
         # ----------------------------------------------------
 
         print(
@@ -410,17 +892,28 @@ def main():
         )
 
         try:
-
+            st.write("DEBUG RESULT TYPE:", type(results))
+            st.write("DEBUG RESULT:", results)
             answer = generate_answer(
                 question,
-                context
+                results
             )
 
-            print("=" * 70)
-            print("PiezoGPT")
-            print("=" * 70)
+            print(
+                "=" * 70
+            )
 
-            print(answer)
+            print(
+                "PiezoGPT"
+            )
+
+            print(
+                "=" * 70
+            )
+
+            print(
+                answer
+            )
 
             print()
 
