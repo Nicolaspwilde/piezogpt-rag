@@ -506,10 +506,9 @@ st.markdown(
 # HERO
 # ============================================================
 
-st.markdown(
+st.html(
     """
     <div class="hero">
-
         <div class="hero-badge">
             ⚡ PIEZOELECTRIC KNOWLEDGE SYSTEM
         </div>
@@ -529,10 +528,8 @@ st.markdown(
         </div>
 
         <div class="field-line"></div>
-
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 
@@ -540,7 +537,7 @@ st.markdown(
 # STATUS
 # ============================================================
 
-st.markdown(
+st.html(
     """
     <div class="status-row">
         <div class="status">
@@ -548,8 +545,7 @@ st.markdown(
             Knowledge base online
         </div>
     </div>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 
@@ -782,7 +778,7 @@ if question:
 
 with st.sidebar:
 
-    st.markdown(
+    st.html(
         """
         <div style="
             font-size: 1.45rem;
@@ -801,8 +797,7 @@ with st.sidebar:
             Scientific AI assistant for
             Linear Piezoelectric Plate Vibrations.
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
     )
 
 
