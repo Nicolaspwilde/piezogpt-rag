@@ -1,44 +1,6 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-.venv/
-env/
-ENV/
-
-# Secrets
 .env
-
-# VS Code
+.venv/
+venv/
+__pycache__/
+*.pyc
 .vscode/
-tempCodeRunnerFile.py
-
-# ChromaDB
-chroma_db/
-
-# Output (optional)
-output/*.txt
-
-# Distribution
-build/
-dist/
-*.egg-info/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Type checking
-.mypy_cache/
-.pytype/
-
-# Jupyter
-.ipynb_checkpoints
-
-# OS
-.DS_Store
-Thumbs.db
