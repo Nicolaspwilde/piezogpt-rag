@@ -558,70 +558,35 @@ def retrieve(question):
 # ============================================================
 
 def build_context(results):
-    """
-    Convert retrieval results into the context format
-    expected by Gemini.
 
-    Supports:
-    1. List of reranked dictionaries returned by retrieve()
-    2. Raw ChromaDB result dictionaries
-    """
+    if not isinstance(results, list):
+        raise TypeError(
+            f"Expected retrieval results to be a list, "
+            f"got {type(results).__name__}"
+        )
 
     context_parts = []
 
-    # --------------------------------------------------------
-    # Case 1: retrieve() returned a list of dictionaries
-    # --------------------------------------------------------
+    for i, result in enumerate(results, start=1):
 
-    if isinstance(results, list):
+        if not isinstance(result, dict):
+            raise TypeError(
+                f"Expected retrieval result {i} to be a dict, "
+                f"got {type(result).__name__}"
+            )
 
-        for i, result in enumerate(results, start=1):
+        document = result.get("document", "")
+        page = result.get("page", "Unknown")
+        chunk_id = result.get("chunk_id", "Unknown")
+        distance = result.get("distance")
 
-            if isinstance(result, dict):
+        if isinstance(distance, (int, float)):
+            distance_text = f"{distance:.4f}"
+        else:
+            distance_text = "Unknown"
 
-                document = result.get(
-                    "document",
-                    ""
-                )
-
-                page = result.get(
-                    "page",
-                    "Unknown"
-                )
-
-                chunk_id = result.get(
-                    "chunk_id",
-                    "Unknown"
-                )
-
-                distance = result.get(
-                    "distance",
-                    None
-                )
-
-                distance_text = (
-                    f"{distance:.4f}"
-                    if isinstance(distance, (int, float))
-                    else "Unknown"
-                )
-
-            # ------------------------------------------------
-            # Unexpected string result
-            # ------------------------------------------------
-
-            elif isinstance(result, str):
-
-                document = result
-                page = "Unknown"
-                chunk_id = "Unknown"
-                distance_text = "Unknown"
-
-            else:
-
-                continue
-
-            context_parts.append(
-                f"""
+        context_parts.append(
+            f"""
 --- SOURCE {i} ---
 Textbook Page: {page}
 Chunk ID: {chunk_id}
@@ -629,69 +594,9 @@ Similarity Distance: {distance_text}
 
 {document}
 """
-            )
+        )
 
-        return "\n".join(context_parts)
-
-    # --------------------------------------------------------
-    # Case 2: raw ChromaDB response
-    # --------------------------------------------------------
-
-    if isinstance(results, dict):
-
-        documents = results.get(
-            "documents",
-            [[]]
-        )[0]
-
-        metadatas = results.get(
-            "metadatas",
-            [[]]
-        )[0]
-
-        distances = results.get(
-            "distances",
-            [[]]
-        )[0]
-
-        for i, (document, metadata, distance) in enumerate(
-            zip(
-                documents,
-                metadatas,
-                distances
-            ),
-            start=1
-        ):
-
-            metadata = metadata or {}
-
-            page = metadata.get(
-                "page",
-                "Unknown"
-            )
-
-            chunk_id = metadata.get(
-                "chunk_id",
-                "Unknown"
-            )
-
-            context_parts.append(
-                f"""
---- SOURCE {i} ---
-Textbook Page: {page}
-Chunk ID: {chunk_id}
-Similarity Distance: {distance:.4f}
-
-{document}
-"""
-            )
-
-        return "\n".join(context_parts)
-
-    raise TypeError(
-        f"Unexpected retrieval result type: "
-        f"{type(results).__name__}"
-    )
+    return "\n".join(context_parts)
 # ============================================================
 # Generate Answer
 # ============================================================
