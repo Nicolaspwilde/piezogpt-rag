@@ -11,7 +11,7 @@ from src.chatbot import generate_answer
 st.set_page_config(
     page_title="PiezoGPT",
     page_icon="⚡",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="expanded",
 )
 
@@ -25,110 +25,473 @@ st.markdown(
     <style>
 
     /* ========================================================
-       Main Application
+       GLOBAL
        ======================================================== */
 
     .stApp {
-        background-color: #0b1020;
+        background:
+            radial-gradient(
+                circle at 15% 10%,
+                rgba(0, 210, 255, 0.08),
+                transparent 28%
+            ),
+            radial-gradient(
+                circle at 85% 15%,
+                rgba(130, 80, 255, 0.08),
+                transparent 30%
+            ),
+            linear-gradient(
+                135deg,
+                #060a14 0%,
+                #0a1020 45%,
+                #080d19 100%
+            );
+
+        color: #e8eefc;
     }
+
+
+    /* ========================================================
+       SUBTLE TECHNICAL GRID
+       ======================================================== */
+
+    .stApp::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+
+        background-image:
+            linear-gradient(
+                rgba(255,255,255,0.018) 1px,
+                transparent 1px
+            ),
+            linear-gradient(
+                90deg,
+                rgba(255,255,255,0.018) 1px,
+                transparent 1px
+            );
+
+        background-size: 45px 45px;
+
+        pointer-events: none;
+
+        z-index: 0;
+    }
+
+
+    /* ========================================================
+       MAIN CONTAINER
+       ======================================================== */
 
     .block-container {
-        max-width: 900px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
+        max-width: 1100px;
+
+        padding-top: 2.2rem;
+        padding-bottom: 5rem;
     }
 
 
     /* ========================================================
-       Header
+       HERO
        ======================================================== */
 
-    .main-title {
-        font-size: 3.2rem;
-        font-weight: 800;
+    .hero {
         text-align: center;
-        margin-bottom: 0.2rem;
-        color: #ffffff;
-        letter-spacing: -1px;
+
+        padding: 28px 20px 20px 20px;
+
+        margin-bottom: 18px;
     }
 
-    .main-subtitle {
-        text-align: center;
-        color: #a8b3c7;
-        font-size: 1.05rem;
-        margin-bottom: 0.6rem;
+
+    .hero-badge {
+        display: inline-flex;
+
+        align-items: center;
+        gap: 8px;
+
+        padding: 7px 14px;
+
+        border-radius: 999px;
+
+        background: rgba(0, 220, 255, 0.07);
+
+        border: 1px solid rgba(0, 220, 255, 0.25);
+
+        color: #71e8ff;
+
+        font-size: 0.76rem;
+
+        font-weight: 600;
+
+        letter-spacing: 0.04em;
+
+        margin-bottom: 18px;
+
+        box-shadow:
+            0 0 20px rgba(0, 220, 255, 0.08);
     }
 
-    .main-description {
-        text-align: center;
-        color: #7f8ba3;
-        max-width: 650px;
-        margin: 0 auto;
-        line-height: 1.6;
+
+    .hero-title {
+        font-size: 4rem;
+
+        font-weight: 850;
+
+        letter-spacing: -0.055em;
+
+        line-height: 1;
+
+        margin-bottom: 12px;
+
+        background:
+            linear-gradient(
+                100deg,
+                #ffffff 10%,
+                #7cecff 48%,
+                #a98bff 90%
+            );
+
+        -webkit-background-clip: text;
+
+        -webkit-text-fill-color: transparent;
+
+        background-clip: text;
+    }
+
+
+    .hero-subtitle {
+        color: #b5c2d9;
+
+        font-size: 1.08rem;
+
+        font-weight: 500;
+
+        margin-bottom: 9px;
+    }
+
+
+    .hero-description {
+        max-width: 680px;
+
+        margin: auto;
+
+        color: #75839d;
+
         font-size: 0.9rem;
+
+        line-height: 1.65;
     }
 
 
     /* ========================================================
-       Status
+       ELECTRIC FIELD LINE
        ======================================================== */
 
-    .status-wrapper {
-        text-align: center;
-        margin-top: 1rem;
-        margin-bottom: 2rem;
+    .field-line {
+        width: 170px;
+
+        height: 2px;
+
+        margin: 22px auto 0 auto;
+
+        background:
+            linear-gradient(
+                90deg,
+                transparent,
+                #36dfff,
+                #9274ff,
+                transparent
+            );
+
+        box-shadow:
+            0 0 12px rgba(54, 223, 255, 0.45);
     }
+
+
+    /* ========================================================
+       STATUS
+       ======================================================== */
+
+    .status-row {
+        display: flex;
+
+        justify-content: center;
+
+        margin: 5px 0 28px 0;
+    }
+
 
     .status {
-        display: inline-block;
-        padding: 6px 14px;
-        border-radius: 20px;
-        background-color: #10251a;
-        border: 1px solid #245c3a;
-        color: #7ed69a;
-        font-size: 0.78rem;
+        display: inline-flex;
+
+        align-items: center;
+
+        gap: 8px;
+
+        padding: 7px 14px;
+
+        border-radius: 999px;
+
+        background: rgba(38, 190, 110, 0.07);
+
+        border: 1px solid rgba(73, 220, 137, 0.25);
+
+        color: #76e3a1;
+
+        font-size: 0.76rem;
+
+        font-weight: 600;
+    }
+
+
+    .status-dot {
+        width: 7px;
+
+        height: 7px;
+
+        border-radius: 50%;
+
+        background: #4fe28c;
+
+        box-shadow:
+            0 0 9px rgba(79, 226, 140, 0.9);
     }
 
 
     /* ========================================================
-       Sidebar
+       FEATURE CARDS
        ======================================================== */
 
-    section[data-testid="stSidebar"] {
-        background-color: #080d19;
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background:
+            linear-gradient(
+                145deg,
+                rgba(18, 27, 49, 0.94),
+                rgba(10, 17, 32, 0.92)
+            );
+
+        border: 1px solid rgba(120, 145, 190, 0.15);
+
+        border-radius: 16px;
+
+        box-shadow:
+            0 12px 35px rgba(0, 0, 0, 0.18);
+
+        transition:
+            transform 0.2s ease,
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
+    }
+
+
+    [data-testid="stVerticalBlockBorderWrapper"]:hover {
+        transform: translateY(-2px);
+
+        border-color:
+            rgba(74, 220, 255, 0.3);
+
+        box-shadow:
+            0 15px 40px rgba(0, 0, 0, 0.28),
+            0 0 25px rgba(30, 190, 255, 0.05);
     }
 
 
     /* ========================================================
-       Chat
+       FEATURE TEXT
+       ======================================================== */
+
+    .feature-icon {
+        font-size: 1.45rem;
+
+        margin-bottom: 4px;
+    }
+
+
+    .feature-heading {
+        color: #f2f6ff;
+
+        font-size: 0.94rem;
+
+        font-weight: 700;
+
+        margin-bottom: 5px;
+    }
+
+
+    .feature-text {
+        color: #7887a2;
+
+        font-size: 0.76rem;
+
+        line-height: 1.5;
+    }
+
+
+    /* ========================================================
+       SECTION LABEL
+       ======================================================== */
+
+    .section-label {
+        color: #61708b;
+
+        font-size: 0.7rem;
+
+        font-weight: 700;
+
+        text-transform: uppercase;
+
+        letter-spacing: 0.14em;
+
+        margin-top: 28px;
+
+        margin-bottom: 10px;
+    }
+
+
+    /* ========================================================
+       CHAT
        ======================================================== */
 
     [data-testid="stChatMessage"] {
-        border-radius: 12px;
+        background: rgba(12, 19, 35, 0.72);
+
+        border: 1px solid rgba(120, 145, 190, 0.08);
+
+        border-radius: 16px;
+
+        padding: 8px 14px;
+
+        margin-bottom: 8px;
     }
 
 
     /* ========================================================
-       Chat Input
+       CHAT INPUT
        ======================================================== */
 
     [data-testid="stChatInput"] {
-        border-radius: 12px;
+        border-radius: 16px;
+    }
+
+
+    [data-testid="stChatInput"] textarea {
+        background: #0d1526 !important;
+
+        color: #edf5ff !important;
+
+        border: 1px solid #263652 !important;
+
+        border-radius: 14px !important;
     }
 
 
     /* ========================================================
-       Mobile
+       SIDEBAR
+       ======================================================== */
+
+    section[data-testid="stSidebar"] {
+        background:
+            linear-gradient(
+                180deg,
+                #070c17 0%,
+                #080e1b 100%
+            );
+
+        border-right: 1px solid rgba(100, 130, 180, 0.08);
+    }
+
+
+    section[data-testid="stSidebar"] h1 {
+        color: #eef6ff;
+    }
+
+
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        color: #dce8fb;
+    }
+
+
+    section[data-testid="stSidebar"] p {
+        color: #7e8da8;
+    }
+
+
+    /* ========================================================
+       METRIC
+       ======================================================== */
+
+    [data-testid="stMetric"] {
+        background: rgba(15, 24, 43, 0.7);
+
+        border: 1px solid rgba(100, 130, 180, 0.1);
+
+        padding: 12px;
+
+        border-radius: 12px;
+    }
+
+
+    [data-testid="stMetricValue"] {
+        color: #72e8ff;
+    }
+
+
+    /* ========================================================
+       BUTTON
+       ======================================================== */
+
+    .stButton button {
+        border-radius: 10px;
+
+        border: 1px solid #263752;
+
+        background: #101a2e;
+
+        color: #b9c8df;
+
+        transition: all 0.2s ease;
+    }
+
+
+    .stButton button:hover {
+        border-color: #35dfff;
+
+        color: #ffffff;
+
+        background: #13223a;
+
+        box-shadow:
+            0 0 18px rgba(53, 223, 255, 0.08);
+    }
+
+
+    /* ========================================================
+       DIVIDERS
+       ======================================================== */
+
+    hr {
+        border-color: rgba(120, 145, 190, 0.1);
+    }
+
+
+    /* ========================================================
+       MOBILE
        ======================================================== */
 
     @media (max-width: 700px) {
 
-        .main-title {
-            font-size: 2.4rem;
+        .hero-title {
+            font-size: 2.7rem;
         }
 
-        .main-subtitle {
-            font-size: 0.95rem;
+        .hero-subtitle {
+            font-size: 0.92rem;
+        }
+
+        .hero-description {
+            font-size: 0.82rem;
         }
 
     }
@@ -140,37 +503,33 @@ st.markdown(
 
 
 # ============================================================
-# Header
+# HERO
 # ============================================================
 
 st.markdown(
-    '<div class="main-title">⚡ PiezoGPT</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="main-subtitle">'
-    'AI assistant for <i>Linear Piezoelectric Plate Vibrations</i>'
-    ' by H. F. Tiersten'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="main-description">'
-    "Ask questions about the textbook. "
-    "PiezoGPT retrieves relevant passages from the "
-    "knowledge base and generates grounded answers using Gemini."
-    "</div>",
-    unsafe_allow_html=True,
-)
-
-st.markdown(
     """
-    <div class="status-wrapper">
-        <span class="status">
-            ● Knowledge base online
-        </span>
+    <div class="hero">
+
+        <div class="hero-badge">
+            ⚡ PIEZOELECTRIC KNOWLEDGE SYSTEM
+        </div>
+
+        <div class="hero-title">
+            PiezoGPT
+        </div>
+
+        <div class="hero-subtitle">
+            Linear Piezoelectric Plate Vibrations
+        </div>
+
+        <div class="hero-description">
+            A domain-specific AI assistant grounded exclusively
+            in H. F. Tiersten's textbook, combining semantic
+            retrieval with Gemini-powered technical reasoning.
+        </div>
+
+        <div class="field-line"></div>
+
     </div>
     """,
     unsafe_allow_html=True,
@@ -178,29 +537,51 @@ st.markdown(
 
 
 # ============================================================
-# Feature Cards
+# STATUS
 # ============================================================
-#
-# IMPORTANT:
-# These cards intentionally use native Streamlit components.
-# Do NOT use <div> HTML here.
-#
 
-col1, col2, col3 = st.columns(3)
+st.markdown(
+    """
+    <div class="status-row">
+        <div class="status">
+            <span class="status-dot"></span>
+            Knowledge base online
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# FEATURE CARDS
+# ============================================================
+
+col1, col2, col3 = st.columns(3, gap="medium")
 
 
 with col1:
 
     with st.container(border=True):
 
-        st.markdown("### 📚")
-
         st.markdown(
-            "**Textbook Grounded**"
+            '<div class="feature-icon">📚</div>',
+            unsafe_allow_html=True,
         )
 
-        st.caption(
-            "Answers are grounded in Tiersten's textbook."
+        st.markdown(
+            '<div class="feature-heading">'
+            'Textbook Grounded'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="feature-text">'
+            "Answers are grounded in Tiersten's "
+            "Linear Piezoelectric Plate Vibrations."
+            '</div>',
+            unsafe_allow_html=True,
         )
 
 
@@ -208,15 +589,24 @@ with col2:
 
     with st.container(border=True):
 
-        st.markdown("### 🔎")
-
         st.markdown(
-            "**Smart Retrieval**"
+            '<div class="feature-icon">⚡</div>',
+            unsafe_allow_html=True,
         )
 
-        st.caption(
-            "Relevant technical passages are retrieved "
-            "from the knowledge base."
+        st.markdown(
+            '<div class="feature-heading">'
+            'Semantic Retrieval'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            '<div class="feature-text">'
+            "Technical passages are retrieved and "
+            "reranked before generation."
+            '</div>',
+            unsafe_allow_html=True,
         )
 
 
@@ -224,115 +614,45 @@ with col3:
 
     with st.container(border=True):
 
-        st.markdown("### 🤖")
+        st.markdown(
+            '<div class="feature-icon">🧠</div>',
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
-            "**Gemini Powered**"
+            '<div class="feature-heading">'
+            'Gemini Intelligence'
+            '</div>',
+            unsafe_allow_html=True,
         )
 
-        st.caption(
-            "Gemini generates concise, grounded answers."
+        st.markdown(
+            '<div class="feature-text">'
+            "Grounded technical responses with "
+            "textbook page citations."
+            '</div>',
+            unsafe_allow_html=True,
         )
 
 
-st.markdown("")
+# ============================================================
+# ASK SECTION
+# ============================================================
+
+st.markdown(
+    '<div class="section-label">Ask the textbook</div>',
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
-# Sidebar
-# ============================================================
-
-with st.sidebar:
-
-    st.title("⚡ PiezoGPT")
-
-    st.caption(
-        "Domain-specific RAG assistant for "
-        "Linear Piezoelectric Plate Vibrations."
-    )
-
-    st.divider()
-
-
-    # --------------------------------------------------------
-    # How It Works
-    # --------------------------------------------------------
-
-    st.subheader("🧠 How it works")
-
-    st.markdown(
-        """
-        **1. Ask**
-
-        Ask a question about the textbook.
-
-        **2. Retrieve**
-
-        Relevant textbook passages are retrieved.
-
-        **3. Generate**
-
-        Gemini generates an answer from the retrieved content.
-
-        **4. Cite**
-
-        Relevant textbook page numbers are provided.
-        """
-    )
-
-    st.divider()
-
-
-    # --------------------------------------------------------
-    # Knowledge Base
-    # --------------------------------------------------------
-
-    st.subheader("📚 Knowledge Base")
-
-    st.metric(
-        label="Textbook chunks",
-        value="539",
-    )
-
-    st.caption(
-        "Answers are grounded in the indexed textbook."
-    )
-
-    st.divider()
-
-
-    # --------------------------------------------------------
-    # Clear Chat
-    # --------------------------------------------------------
-
-    if st.button(
-        "🗑️ Clear Chat",
-        use_container_width=True,
-    ):
-
-        st.session_state.messages = []
-
-        st.rerun()
-
-    st.divider()
-
-    st.caption(
-        "PiezoGPT • RAG-based technical assistant"
-    )
-
-
-# ============================================================
-# Chat History
+# CHAT HISTORY
 # ============================================================
 
 if "messages" not in st.session_state:
 
     st.session_state.messages = []
 
-
-# ============================================================
-# Display Previous Messages
-# ============================================================
 
 for message in st.session_state.messages:
 
@@ -346,16 +666,16 @@ for message in st.session_state.messages:
 
 
 # ============================================================
-# User Input
+# USER INPUT
 # ============================================================
 
 question = st.chat_input(
-    "Ask something about piezoelectricity..."
+    "Ask about piezoelectricity, equations, vibrations..."
 )
 
 
 # ============================================================
-# Process Question
+# PROCESS QUESTION
 # ============================================================
 
 if question:
@@ -371,6 +691,7 @@ if question:
         }
     )
 
+
     with st.chat_message("user"):
 
         st.markdown(
@@ -379,19 +700,19 @@ if question:
 
 
     # --------------------------------------------------------
-    # Assistant Response
+    # Assistant
     # --------------------------------------------------------
 
     with st.chat_message("assistant"):
 
         with st.spinner(
-            "Searching the textbook..."
+            "Searching Tiersten's textbook..."
         ):
 
             try:
 
                 # =================================================
-                # Retrieve Relevant Textbook Chunks
+                # Retrieval
                 # =================================================
 
                 results = retrieve(
@@ -413,19 +734,10 @@ if question:
 
 
                 # =================================================
-                # Generate Answer
+                # Generate
                 # =================================================
 
                 else:
-
-                    # IMPORTANT:
-                    #
-                    # Pass the ORIGINAL list returned by retrieve().
-                    #
-                    # generate_answer() calls build_context()
-                    # internally.
-                    #
-                    # Do NOT convert results into a string.
 
                     answer = generate_answer(
                         question,
@@ -434,7 +746,7 @@ if question:
 
 
                 # =================================================
-                # Display Answer
+                # Display
                 # =================================================
 
                 st.markdown(
@@ -443,7 +755,7 @@ if question:
 
 
                 # =================================================
-                # Store Assistant Response
+                # Save
                 # =================================================
 
                 st.session_state.messages.append(
@@ -454,10 +766,6 @@ if question:
                 )
 
 
-            # =====================================================
-            # Error Handling
-            # =====================================================
-
             except Exception as e:
 
                 st.error(
@@ -466,3 +774,128 @@ if question:
                 )
 
                 st.exception(e)
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.markdown(
+        """
+        <div style="
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #eef6ff;
+            margin-bottom: 4px;
+        ">
+            ⚡ PiezoGPT
+        </div>
+
+        <div style="
+            font-size: 0.76rem;
+            color: #6f7e98;
+            line-height: 1.5;
+        ">
+            Scientific AI assistant for
+            Linear Piezoelectric Plate Vibrations.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # System
+    # --------------------------------------------------------
+
+    st.subheader("⚙️ System")
+
+
+    st.markdown(
+        """
+        **Retrieval**
+
+        Semantic + technical reranking
+
+        **Knowledge**
+
+        H. F. Tiersten
+
+        **Generation**
+
+        Gemini
+        """
+    )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # Knowledge Base
+    # --------------------------------------------------------
+
+    st.subheader("📚 Knowledge Base")
+
+    st.metric(
+        label="Textbook chunks",
+        value="539",
+    )
+
+    st.caption(
+        "Indexed technical content from the textbook."
+    )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # How It Works
+    # --------------------------------------------------------
+
+    st.subheader("🔬 Pipeline")
+
+    st.markdown(
+        """
+        **01** — Ask
+
+        **02** — Retrieve
+
+        **03** — Rerank
+
+        **04** — Generate
+
+        **05** — Cite
+        """
+    )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # Clear Chat
+    # --------------------------------------------------------
+
+    if st.button(
+        "🗑️ Clear conversation",
+        use_container_width=True,
+    ):
+
+        st.session_state.messages = []
+
+        st.rerun()
+
+
+    st.divider()
+
+
+    st.caption(
+        "PiezoGPT • Scientific RAG Assistant"
+    )
